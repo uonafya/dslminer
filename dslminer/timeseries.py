@@ -32,6 +32,7 @@ class predictor:
         future = m.make_future_dataframe(periods = 3,freq = "Y")
         forecast = m.predict(future)
         print(decomposition.seasonal)
+        print(decomposition.resid)
         return forecast
         #print(forecast.ds)
 
