@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request
 from . import timeseries
+import json
 app = Flask(__name__)
 
 # forecast indicator data
@@ -21,4 +22,5 @@ def show_user_profile(indicatorid):
     data=p.predict(indicatorid,ouid,periodtype,periodspan)
 
     # show the user profile for that user
+    data=json.dumps(data)
     return data
