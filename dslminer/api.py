@@ -18,7 +18,8 @@ def show_user_profile(indicatorid):
     app.logger.debug("======")
     if(ouid==None):
         ouid=18 # National org unit id
-    periodspan=int(periodspan)
+    if(periodspan!=None):
+        periodspan=int(periodspan)
     data=p.predict(indicatorid,ouid,periodtype,periodspan)
 
     # show the user profile for that user
