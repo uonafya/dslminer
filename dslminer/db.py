@@ -9,11 +9,11 @@ class database:
     def get_db_con(self):
         try:
 
-            self.connection = psycopg2.connect(user = "postgres",
+            self.connection = psycopg2.connect(user = "",
                                           password = "",
-                                          host = "127.0.0.1",
-                                          port = "5432",
-                                          database = "mohdsl")
+                                          host = "",
+                                          port = "",
+                                          database = "")
             connection =self.connection
             self.cursor = connection.cursor()
 

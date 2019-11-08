@@ -20,8 +20,9 @@ class predictor:
         cursor = _db.get_db_con()[1]
 
         query_string = '''SELECT  distinct startdate, kpivalue
-            FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=%s %s order by startdate asc''' %(ouid,indicatorid)
+            FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=%s order by startdate asc''' %(indicatorid,ouid)
         SQL_Query = pd.read_sql_query(query_string, connection)
+        print(query_string)
 
         data = pd.DataFrame(SQL_Query)
         _db.close_db_con()
@@ -29,7 +30,19 @@ class predictor:
         m = Prophet()
         data.columns = ['ds','y']
         m.fit(data)
-        future = m.make_future_dataframe(periods = 3,freq = "Y")
+
+        if(periodspan==None):
+            periodspan=int(2)
+
+        if(periodtype==None):
+            periodtype = 'Y'
+        elif(periodtype=='yearly'):
+            periodtype='Y'
+        elif(periodtype=='monthly'):
+            periodtype='M'
+
+
+        future = m.make_future_dataframe(periods = periodspan,freq = periodtype)
 
         forecast = m.predict(future)
         log.logger.info("======> 1")
@@ -73,8 +86,6 @@ class predictor:
         indicator_series_data[indicatorid] = orgunit_series_data
         series_data_envelop["data"]=indicator_series_data
             # print(decomposition.seasonal)
-        # print(decomposition.resid)
         return series_data_envelop
-        #print(forecast.ds)
 
 
