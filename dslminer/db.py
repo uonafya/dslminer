@@ -9,15 +9,13 @@ class database:
     def get_db_con(self):
         try:
 
-            self.connection = psycopg2.connect(user = "",
+            self.connection = psycopg2.connect(user = "postgres",
                                           password = "",
-                                          host = "",
-                                          port = "",
-                                          database = "")
+                                          host = "127.0.0.1",
+                                          port = "5432",
+                                          database = "mohdsl")
             connection =self.connection
             self.cursor = connection.cursor()
-            # Print PostgreSQL Connection properties
-            print ( connection.get_dsn_parameters(),"\n")
 
             # Print PostgreSQL version
             self.cursor.execute("SELECT version();")

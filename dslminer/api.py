@@ -10,7 +10,11 @@ def show_user_profile(indicatorid):
     periodtype = request.args.get('periodtype') # can yealy 'Y' or montly 'M'
     startyearmonth = request.args.get('startyearmonth') # start scope date for our dataset
     endyearmonth = request.args.get('endyearmonth') # end scope date for our dataset
+    ouid = request.args.get('ouid')  # orgunit id
     p=timeseries.predictor()
-    p.predict()
+    if(ouid==None):
+        ouid=18 # National org unit id
+    data=p.predict(indicatorid,ouid,startyearmonth,endyearmonth,periodtype,periodspan)
+    app.logger.debug("======> 1")
     # show the user profile for that user
-    return "{data}"
+    return data
