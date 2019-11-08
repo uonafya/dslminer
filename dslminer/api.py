@@ -14,7 +14,7 @@ def show_user_profile(indicatorid):
     p=timeseries.predictor()
     if(ouid==None):
         ouid=18 # National org unit id
-    data=p.predict(indicatorid,ouid,startyearmonth,endyearmonth,periodtype,periodspan)
+    data=p.predict(indicatorid,ouid,periodtype,periodspan)
     app.logger.debug("======> 1")
     # show the user profile for that user
     return data

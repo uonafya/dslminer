@@ -7,25 +7,25 @@ import time
 import numpy as np
 from statsmodels.tsa.arima_model import ARIMA
 from fbprophet import Prophet
-
+from . import utils
 from . import db
 from flask import Flask
 
 log = Flask(__name__)
 
 class predictor:
-    def predict(self,indicatorid,ouid=None,startyearmonth=None,endyearmonth=None,periodtype=None,periodspan=None):
+    def predict(self,indicatorid,ouid=None,periodtype=None,periodspan=None):
         _db = db.database()
         connection = _db.get_db_con()[0]
         cursor = _db.get_db_con()[1]
+
         query_string = '''SELECT  distinct startdate, kpivalue
-            FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=18 order by startdate asc''' %indicatorid
+            FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=%s %s order by startdate asc''' %(ouid,indicatorid)
         SQL_Query = pd.read_sql_query(query_string, connection)
 
         data = pd.DataFrame(SQL_Query)
         _db.close_db_con()
-        data_cp=data.copy()
-        decomposition = sm.tsa.seasonal_decompose(data.kpivalue, freq=20)
+        #decomposition = sm.tsa.seasonal_decompose(data.kpivalue, freq=20)
         m = Prophet()
         data.columns = ['ds','y']
         m.fit(data)
