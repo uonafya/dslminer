@@ -7,7 +7,7 @@ app = Flask(__name__)
 # forecast indicator data
 @app.route('/forecast/<indicatorid>/',strict_slashes=False)
 def show_user_profile(indicatorid):
-    periodspan = request.args.get('periodspan') # the number of dependent values to be generated based on periodtype
+    periodspan = request.args.get('periodspan') # the number of dependent values to be generated based on periodtype (give prediction data to which time)
     periodtype = request.args.get('periodtype') # can yealy 'Y' or montly 'M'
     ouid = request.args.get('ouid')  # orgunit id
     p=timeseries.predictor()
