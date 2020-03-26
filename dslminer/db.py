@@ -2,28 +2,25 @@ import psycopg2
 import click
 from flask import current_app, g
 from flask.cli import with_appcontext
-
+import logging
+log = logging.getLogger("db.py")
 
 class database:
 
     def get_db_con(self):
         try:
 
-            self.connection = psycopg2.connect(user = "",
+            self.connection = psycopg2.connect(user = "postgres",
                                           password = "",
-                                          host = "",
-                                          port = "",
-                                          database = "")
+                                          host = "localhost",
+                                          port = "5432",
+                                          database = "mohdsl")
             connection =self.connection
             self.cursor = connection.cursor()
-
-            # Print PostgreSQL version
-            self.cursor.execute("SELECT version();")
-            record = self.cursor.fetchone()
-            print("You are connected to - ", record,"\n")
+            log.info("Connected to database ")
 
         except (Exception, psycopg2.Error) as error :
-            print ("Error while connecting to PostgreSQL", error)
+            log.error ("Error while connecting to PostgreSQL", error)
 
         return (connection, self.cursor)
 
@@ -32,4 +29,4 @@ class database:
         if(self.connection):
             self.cursor.close()
             self.connection.close()
-            print("PostgreSQL connection is closed")
+            log.info("PostgreSQL connection is closed")
