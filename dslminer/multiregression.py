@@ -30,34 +30,25 @@ def set_max_min_period(indictor_id,orgunit_id):
             ----------
             void
             """
-    max_period=''' SELECT  date_part('year',max(startdate))
+    max_min_period=''' SELECT  date_part('year',max(startdate)) as mx, date_part('year',min(startdate)) as mn
                 FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"='''+str(indictor_id)+''' and "Org unit id"='''+str(orgunit_id)
-    min_period = ''' SELECT  date_part('year',min(startdate))
-                    FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=''' + str(indictor_id) + ''' and "Org unit id"=''' + str(orgunit_id)
 
     cursor = _db.get_db_con()[1]
-    cursor.execute(max_period)
+    cursor.execute(max_min_period)
     row = cursor.fetchall()
     if (len(row) != 0):
         END_YEAR=int(row[0][0])
-        log.info("end year "+str(row[0][0]))
-
-    cursor.execute(min_period)
-    row = cursor.fetchall()
-    if (len(row) != 0):
-        if(int(row[0][0]<2009)):
+        if (int(row[0][0] < 2009)):
             pass
         else:
-            BEGIN_YEAR = int(row[0][0])
-        log.info("start year"+ str(row[0][0]))
+            BEGIN_YEAR = int(row[0][1])
+        log.info("end year "+str(row[0][0]))
+        log.info("start year " + str(BEGIN_YEAR))
 
 
 def get_indicator_data(indicatorid,ouid):
-    # BEGIN_YEAR = 2009
-    # END_YEAR = 2019
-
     connection = _db.get_db_con()[0]
-    cursor = _db.get_db_con()[1]
+    # cursor = _db.get_db_con()[1]
     query_string = '''SELECT  distinct startdate, kpivalue
                 FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=%s and startdate>='%s' and enddate<='%s' order by startdate asc''' % (
     indicatorid,ouid,str(BEGIN_YEAR)+"-01-01", str(END_YEAR)+"-12-31" )
