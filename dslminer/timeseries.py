@@ -1,13 +1,5 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib import pyplot
-from statsmodels.tsa.stattools import adfuller
-import statsmodels.api as sm
-import time
-import numpy as np
-from statsmodels.tsa.arima_model import ARIMA
 from fbprophet import Prophet
-from . import utils
 from . import db
 from flask import Flask
 
