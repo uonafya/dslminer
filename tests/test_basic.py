@@ -34,7 +34,5 @@ class RegressionTest(unittest.TestCase):
         self.assertTrue(len(self.multiregression.get_cadres_by_year(self.orgunit_id, self.cadre_id))>3
                               )
 
-
-
 if __name__ == '__main__':
     unittest.main()

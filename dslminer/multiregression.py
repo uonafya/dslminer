@@ -4,7 +4,7 @@ import json
 import numpy as np
 import pandas as pd
 from sklearn import linear_model
-from . import db
+import db
 from datetime import datetime
 
 
@@ -91,7 +91,7 @@ class MultiRegression:
         return cadre_alloc_pd
 
 
-    def run_model(self,data_frame):
+    def run_model(self,data_frame,cadre_condition_list):
         # Data preprocessing/data cleaning
         # look the missing values (NaN)
         median_cadre_value = data_frame['cadre_value'].median()
@@ -103,17 +103,20 @@ class MultiRegression:
         # Train the model Linear Regression
         reg = linear_model.LinearRegression()
         reg.fit(data_frame[['cadre_value']], data_frame.kpivalue)
-        log.info(reg.predict([[1]]))
+        prediction=str('%.2f' % reg.predict([cadre_condition_list])[0])
+        log.info(prediction) # two decimal places
+        return prediction
 
 
-    def run_regression(self,orgunit_id,indicator_id,cadre_list):
+    def run_regression(self,orgunit_id,indicator_id,cadre_list,cadre_condition_list):
         self.set_max_min_period(orgunit_id,indicator_id)
         indicator_df = self.get_indicator_data(orgunit_id, indicator_id)
         cadres_df = self.get_cadres_by_year(orgunit_id,cadre_list)
         indicator_df = indicator_df.set_index('startdate') # make startdate index to allow concatination axes reference
         cadres_df = cadres_df.set_index('startdate') # make startdate index to allow concatination axes reference
-        final_df = result = pd.concat([indicator_df, cadres_df], axis=1, sort=False)
-        self.run_model(final_df)
+        final_df = pd.concat([indicator_df, cadres_df], axis=1, sort=False)
+        self.run_model(final_df,cadre_condition_list)
         self._db.close_db_con()
 
-    #run_regression(23519,61901,[33])
+# r=MultiRegression()
+# r.run_regression(23519,61901,[33],[2])
