@@ -6,10 +6,12 @@ import numpy as np
 import pandas as pd
 from sklearn import linear_model
 import db
+from datetime import datetime
+
 
 # configurations
 log = logging.getLogger("dataloader")
-logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',level=logging.INFO)
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',level=logging.DEBUG)
 
 BASE_URL="http://dsl.health.go.ke/dsl/api/"
 BEGIN_YEAR=2009
@@ -55,19 +57,39 @@ def get_indicator_data(indicatorid,ouid):
     log.info(query_string)
     pd_resultset = pd.read_sql_query(query_string, connection)
     log.info(query_string)
-    data = pd.DataFrame(pd_resultset)
-    log.info(data.head())
+    indicator_df = pd.DataFrame(pd_resultset)
+    log.info(indicator_df.head())
+    return indicator_df
 
 
-def get_cadres_by_year(orgunit,cadreid_list,begin_year,end_year):
+def get_cadres_by_year(cadreid_list,orgunit,begin_year,end_year):
+    data ={ "startdate": [], "cadre_value": [] }
     for year in range(begin_year, end_year):
-        for org in orgunit:
-            for cadre in cadreid_list:
-                log.info(org)
-                log.info(cadreid_list)
-                log.info(BASE_URL + 'cadres?pe=' + str(year) + '&ouid=' + orgunit + '&id=' + cadre['id'] + '&periodtype=monthly')
-
+        for cadre in cadreid_list:
+            log.info(cadreid_list)
+            req_url=BASE_URL + 'cadres?pe=' + str(year) + '&ouid=' + str(orgunit) + '&id=' + str(cadre) + '&periodtype=monthly'
+            req = requests.get(req_url)
+            if("Error Code" in req.text):
+                continue
+            cadre_allocation=json.loads(req.text)
+            log.debug(cadre_allocation)
+            for cadre_alloc in cadre_allocation:
+                year=cadre_alloc['period'][:4]
+                month = cadre_alloc['period'][4:]
+                final_period=year+"-"+month+"-1"
+                cadre_date = datetime.strptime(final_period, '%Y-%m-%d').date()
+                data["startdate"].append(cadre_date)
+                data['cadre_value'].append(cadre_alloc['cadreCount'])
+    cadre_alloc_pd = pd.DataFrame(data)
+    log.info(cadre_alloc_pd.head())
+    return cadre_alloc_pd
 
 set_max_min_period(61901,23519)
-get_indicator_data(61901,23519)
+indicator_df=get_indicator_data(61901,23519)
+cadres_df=get_cadres_by_year([33],23519,BEGIN_YEAR,END_YEAR)
+log.info("=============final data frame=========")
+indicator_df=df = indicator_df.set_index('startdate')
+cadres_df=df = cadres_df.set_index('startdate')
+final_df=result = pd.concat([indicator_df, cadres_df], axis=1, sort=False)
+log.info(final_df.head())
 _db.close_db_con()
