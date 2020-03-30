@@ -100,6 +100,10 @@ class MultiRegression:
         median_kpivalue = data_frame['kpivalue'].median()
         data_frame.kpivalue = data_frame.kpivalue.fillna(median_kpivalue)
 
+        data_frame=data_frame.astype({'cadre_value': 'int32'})
+        log.info("correlation scoring")
+        log.info(data_frame.corr())
+
         # Train the model Linear Regression
         reg = linear_model.LinearRegression()
         reg.fit(data_frame[['cadre_value']], data_frame.kpivalue)

@@ -22,6 +22,5 @@ def show_user_profile(indicatorid):
         periodspan=int(periodspan)
     data=p.predict(indicatorid,ouid,periodtype,periodspan)
 
-    # show the user profile for that user
     data=json.dumps(data)
     return data
