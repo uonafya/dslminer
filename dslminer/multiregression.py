@@ -1,7 +1,9 @@
 import requests
 import logging
 import json
-import numpy as np
+import matplotlib
+matplotlib.use("Qt5Agg")
+import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn import linear_model
 import db
@@ -40,7 +42,7 @@ class MultiRegression:
         cursor = self._db.get_db_con()[1]
         cursor.execute(max_min_period)
         row = cursor.fetchall()
-        print("============================ 7")
+        print("============================")
         print(max_min_period)
         if (len(row) != 0):
             print("============================")
@@ -104,6 +106,9 @@ class MultiRegression:
         log.info("correlation scoring")
         log.info(data_frame.corr())
 
+        data_frame.plot(kind='scatter', x='kpivalue', y='cadre_value', title='kpivalue vs cadre_value');
+        # data_frame['cadre_value'].plot(kind='hist');
+        plt.show()
         # Train the model Linear Regression
         reg = linear_model.LinearRegression()
         reg.fit(data_frame[['cadre_value']], data_frame.kpivalue)
