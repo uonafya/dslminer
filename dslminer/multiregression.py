@@ -21,6 +21,7 @@ class MultiRegression:
         self.begin_year=2010
         self.end_year=2019
         self._db = db.database()
+        self.cadres=[]
 
     def set_max_min_period(self,orgunit_id,indictor_id):
         """Sets the begin and end period to query data based on availablility of data from the given indicator
@@ -64,16 +65,16 @@ class MultiRegression:
         indicatorid,ouid,str(self.begin_year)+"-01-01", str(self.end_year)+"-12-31" )
         log.info(query_string)
         pd_resultset = pd.read_sql_query(query_string, connection)
-        log.info(query_string)
         indicator_df = pd.DataFrame(pd_resultset)
-        log.info(indicator_df.head())
+        # log.info(indicator_df.head())
         return indicator_df
 
 
     def get_cadres_by_year(self,orgunit,cadreid_list):
-        data ={ "startdate": [], "cadre_value": [] }
-        for year in range(self.begin_year, self.end_year):
-            for cadre in cadreid_list:
+        data ={ "startdate": [] }
+        date_control=0
+        for cadre in cadreid_list:
+            for year in range(self.begin_year, self.end_year):
                 log.info(cadreid_list)
                 req_url=BASE_URL + 'cadres?pe=' + str(year) + '&ouid=' + str(orgunit) + '&id=' + str(cadre) + '&periodtype=monthly'
                 req = requests.get(req_url)
@@ -82,38 +83,64 @@ class MultiRegression:
                 cadre_allocation=json.loads(req.text)
                 log.debug(cadre_allocation)
                 for cadre_alloc in cadre_allocation:
-                    year=cadre_alloc['period'][:4]
-                    month = cadre_alloc['period'][4:]
-                    final_period=year+"-"+month+"-1"
-                    cadre_date = datetime.strptime(final_period, '%Y-%m-%d').date()
-                    data["startdate"].append(cadre_date)
-                    data['cadre_value'].append(cadre_alloc['cadreCount'])
+                    if(date_control == 0):
+                        year=cadre_alloc['period'][:4]
+                        month = cadre_alloc['period'][4:]
+                        final_period=year+"-"+month+"-1"
+                        cadre_date = datetime.strptime(final_period, '%Y-%m-%d').date()
+                        data["startdate"].append(cadre_date)
+                    if(cadre_alloc['cadre'] in data.keys()):
+                        data[cadre_alloc['cadre']].append(int(cadre_alloc['cadreCount']))
+                    else:
+                        data[cadre_alloc['cadre']]=[]
+                        self.cadres.append(cadre_alloc['cadre'].replace("^ ","").replace(" $",""))
+                        data[cadre_alloc['cadre']].append(int(cadre_alloc['cadreCount']))
+            date_control=1
+        # log.info(len(data[self.cadres[0]]))
+        # log.info(len(data[self.cadres[1]]))
+        # log.info(len(data[self.cadres[2]]))
+        # log.info(len(data[self.cadres[3]]))
+        # log.info(len(data["startdate"]) )
+        # cadre_series=[]
+        # for x in range(len(self.cadres)):
+        #     cadre_series.append(pd.Series(data[self.cadres[x]], name=self.cadres[x]))
+        # cadre_series.append(data["startdate"])
+        # log.info(cadre_series)
+        # cadres_df = pd.concat(cadre_series, axis=1)
+
         cadre_alloc_pd = pd.DataFrame(data)
-        log.info(cadre_alloc_pd.head())
+        # cadre_alloc_pd=cadres_df
+        # log.info(cadre_alloc_pd.head())
         return cadre_alloc_pd
 
 
     def run_model(self,data_frame,cadre_condition_list):
         # Data preprocessing/data cleaning
         # look the missing values (NaN)
-        median_cadre_value = data_frame['cadre_value'].median()
-        data_frame.cadre_value = data_frame.cadre_value.fillna(median_cadre_value)
+        for key in self.cadres:
+            median_cadre_value = data_frame[key].mean()
+            cadre_fillna=data_frame[key]
+            cadre_fillna.fillna(median_cadre_value,inplace=True)
+            # data_frame.cadre_value = data_frame[key].fillna(median_cadre_value)
 
-        median_kpivalue = data_frame['kpivalue'].median()
+        median_kpivalue = data_frame['kpivalue'].mean()
         data_frame.kpivalue = data_frame.kpivalue.fillna(median_kpivalue)
 
-        data_frame=data_frame.astype({'cadre_value': 'int32'})
-        log.info("correlation scoring")
+        # data_frame=data_frame.astype({'cadre_value': 'int32'})
+        log.info("=================> correlation scoring <=================")
         log.info(data_frame.corr())
-
-        data_frame.plot(kind='scatter', x='kpivalue', y='cadre_value', title='kpivalue vs cadre_value');
+        log.info("=================> correlation scoring <=================")
+        # log.info(data_frame.isnull().sum())
+        # data_frame.plot(kind='scatter', x='kpivalue', y='cadre_value', title='kpivalue vs cadre_value');
         # data_frame['cadre_value'].plot(kind='hist');
-        plt.show()
+        # plt.show()
         # Train the model Linear Regression
         reg = linear_model.LinearRegression()
-        reg.fit(data_frame[['cadre_value']], data_frame.kpivalue)
+        reg.fit(data_frame[self.cadres], data_frame.kpivalue)
         prediction=str('%.2f' % reg.predict([cadre_condition_list])[0])
+        log.info("=================> predicted value <=================")  # two decimal places
         log.info(prediction) # two decimal places
+        log.info("=================> predicted value <=================")  # two decimal places
         return prediction
 
 
@@ -123,9 +150,10 @@ class MultiRegression:
         cadres_df = self.get_cadres_by_year(orgunit_id,cadre_list)
         indicator_df = indicator_df.set_index('startdate') # make startdate index to allow concatination axes reference
         cadres_df = cadres_df.set_index('startdate') # make startdate index to allow concatination axes reference
+
         final_df = pd.concat([indicator_df, cadres_df], axis=1, sort=False)
         self.run_model(final_df,cadre_condition_list)
         self._db.close_db_con()
 
-# r=MultiRegression()
-# r.run_regression(23519,61901,[33],[2])
+r=MultiRegression()
+r.run_regression(23519,61901,[33,30,31],[2,20,10])
