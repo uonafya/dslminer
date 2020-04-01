@@ -43,10 +43,10 @@ class MultiRegression:
         cursor = self._db.get_db_con()[1]
         cursor.execute(max_min_period)
         row = cursor.fetchall()
-        print("============================")
-        print(max_min_period)
+        log.info("============================")
+        log.info(max_min_period)
         if (len(row) != 0):
-            print("============================")
+            log.info("============================")
             print(row[0][0])
             self.end_year=int(row[0][0])
             if (int(row[0][0] < 2010)):
@@ -96,21 +96,16 @@ class MultiRegression:
                         self.cadres.append(cadre_alloc['cadre'].replace("^ ","").replace(" $",""))
                         data[cadre_alloc['cadre']].append(int(cadre_alloc['cadreCount']))
             date_control=1
-        # log.info(len(data[self.cadres[0]]))
-        # log.info(len(data[self.cadres[1]]))
-        # log.info(len(data[self.cadres[2]]))
-        # log.info(len(data[self.cadres[3]]))
-        # log.info(len(data["startdate"]) )
-        # cadre_series=[]
-        # for x in range(len(self.cadres)):
-        #     cadre_series.append(pd.Series(data[self.cadres[x]], name=self.cadres[x]))
-        # cadre_series.append(data["startdate"])
-        # log.info(cadre_series)
-        # cadres_df = pd.concat(cadre_series, axis=1)
 
-        cadre_alloc_pd = pd.DataFrame(data)
-        # cadre_alloc_pd=cadres_df
-        # log.info(cadre_alloc_pd.head())
+        # pd.DataFrame(data)
+        cadre_series=[]
+        for x in range(len(self.cadres)):
+            log.info(type(pd.Series(data[self.cadres[x]], name=self.cadres[x])))
+            cadre_series.append(pd.Series(data[self.cadres[x]], name=self.cadres[x]))
+
+        cadre_series.append(pd.Series(data["startdate"], name="startdate"))
+        cadres_df = pd.concat([v for v in cadre_series], axis=1)
+        cadre_alloc_pd=cadres_df
         return cadre_alloc_pd
 
 
@@ -155,5 +150,5 @@ class MultiRegression:
         self.run_model(final_df,cadre_condition_list)
         self._db.close_db_con()
 
-r=MultiRegression()
-r.run_regression(23519,61901,[33,30,31],[2,20,10])
+# r=MultiRegression()
+# r.run_regression(23519,61901,[33,30,31,32],[2,20,10,10])
