@@ -12,7 +12,7 @@ class predictor:
         cursor = _db.get_db_con()[1]
 
         query_string = '''SELECT  distinct startdate, kpivalue
-            FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=%s order by startdate asc''' %(indicatorid,ouid)
+            FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"=%s and "Org unit id"=%s and startdate>'2007-12-31' order by startdate asc''' %(indicatorid,ouid)
         SQL_Query = pd.read_sql_query(query_string, connection)
         print(query_string)
 
