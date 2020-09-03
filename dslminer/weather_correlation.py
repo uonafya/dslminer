@@ -15,7 +15,7 @@ log = logging.getLogger("weather correlation")
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',level=logging.DEBUG)
 
 
-class MultiRegression:
+class WeatherCorrelation:
     def __init__(self):
         self.begin_year=2010
         self.end_year=2019
@@ -126,5 +126,5 @@ class MultiRegression:
         # self.run_model(final_df,cadre_condition_list)
         self._db.close_db_con()
 
-r=MultiRegression()
-r.run_regression(23408,93333)
+r=WeatherCorrelation()
+r.run_regression(23408,23185)
