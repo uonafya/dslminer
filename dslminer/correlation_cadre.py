@@ -11,7 +11,7 @@ from datetime import datetime
 
 
 # configurations
-log = logging.getLogger("dataloader")
+log = logging.getLogger("cadre correlation")
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',level=logging.DEBUG)
 
 BASE_URL="http://dsl.health.go.ke/dsl/api/"
