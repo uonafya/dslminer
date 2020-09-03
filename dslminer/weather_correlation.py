@@ -99,7 +99,7 @@ class WeatherCorrelation:
 
         return weather_df
 
-    def run_regression(self,orgunit_id,indicator_id):
+    def run_correlation(self,orgunit_id,indicator_id):
         self.set_max_min_period(orgunit_id,indicator_id)
         indicator_df = self.get_indicator_data(orgunit_id, indicator_id)
         weather_df = self.get_weather_by_year(orgunit_id)
@@ -127,4 +127,4 @@ class WeatherCorrelation:
         self._db.close_db_con()
 
 r=WeatherCorrelation()
-r.run_regression(23408,23185)
+r.run_correlation(23408,23185)

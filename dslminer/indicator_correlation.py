@@ -95,7 +95,7 @@ class IndicatorCorrelation:
         return final_df
 
 
-    def run_regression(self,orgunit_id,indicator_id,compare_indicators):
+    def run_correlation(self,orgunit_id,indicator_id,compare_indicators):
         compare_indicators=  str(indicator_id)+','+ compare_indicators
         self.set_max_min_period(orgunit_id,indicator_id)
         indicator_df = self.get_indicator_data(orgunit_id, indicator_id,compare_indicators)
@@ -105,4 +105,4 @@ class IndicatorCorrelation:
         self._db.close_db_con()
 
 r=IndicatorCorrelation()
-r.run_regression(23408,23185,'23191,23701,31589')
+r.run_correlation(23408,23185,'23191,23701,31589')
