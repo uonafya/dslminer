@@ -35,7 +35,7 @@ class WeatherCorrelation:
                     FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"='''+str(indictor_id)+''' and "Org unit id"='''+str(orgunit_id)
 
         cursor = self._db.get_db_con()[1]
-        log.logger.info(max_min_period)
+        log.info(max_min_period)
         cursor.execute(max_min_period)
         row = cursor.fetchall()
         log.info("============================")
@@ -176,8 +176,6 @@ class WeatherCorrelation:
 
         #analyses metadata
         period_span = {"start_date":  str(self.begin_year), "end_date": str(self.end_year)}
-        correlation_coeffient = {"correlation_coeffient": "Pearson's correlation"}
-        period_type= {"period_type": "monthly"}
         correlation_dimension = ['kpivalue','dew_point','humidity','temperature','pressure']
 
 
@@ -203,8 +201,8 @@ class WeatherCorrelation:
         dictionary = {
             "analyses": {
                 "period_span": period_span,
-                "correlation_coeffient": correlation_coeffient,
-                "period_type": period_type,
+                "correlation_coeffient":  "Pearson's correlation",
+                "period_type": "monthly",
                 "variables": self.variables,
                 "correlation_dimension": correlation_dimension
             },
