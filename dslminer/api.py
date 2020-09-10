@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request
 from . import timeseries
+from . import weather_correlation
 import json
 app = Flask(__name__)
 
@@ -21,6 +22,19 @@ def do_indicator_timeseries(indicatorid):
     if(periodspan!=None):
         periodspan=int(periodspan)
     data=p.predict(indicatorid,ouid,periodtype,periodspan)
+
+    data=json.dumps(data)
+    return data
+
+# weather correlation with indicator
+@app.route('/correlation/<indicatorid>/<orgunit>/',strict_slashes=False)
+def do_weather_correlation(indicatorid,orgunit):
+    #23185,23408
+    app.logger.info(indicatorid)
+    app.logger.info(orgunit)
+    p=weather_correlation.WeatherCorrelation()
+    app.logger.debug("===weather correlation model started===")
+    data=p.run_correlation(indicatorid,orgunit)
 
     data=json.dumps(data)
     return data
