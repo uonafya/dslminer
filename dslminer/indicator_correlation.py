@@ -51,7 +51,7 @@ class IndicatorCorrelation:
 
 
     def get_indicator_data(self,ouid,compare_indicators):
-        query_string = '''SELECT  distinct startdate , kpivalue , "Indicator name" as indicator , "Organisation Unit Name" as org_unit , "Org unit id" as org_id , 
+        query_string = '''SELECT  distinct startdate ,ROUND(kpivalue,3) , "Indicator name" as indicator , "Organisation Unit Name" as org_unit , "Org unit id" as org_id , 
                     "Indicator ID" as indicator_id ,  _datecreated , lastupdated , "Indicator description"  
                     FROM public.vw_mohdsl_dhis_indicators where "Indicator ID" in (%s) and "Org unit id"=%s and startdate>='%s' and enddate<='%s' order by startdate asc''' % (
         compare_indicators,ouid,str(self.begin_year)+"-01-01", str(self.end_year)+"-12-31" )
@@ -144,7 +144,7 @@ class IndicatorCorrelation:
         for index, row in indicator_df.corr().iterrows():
             value_list=[]
             for x in row.tolist():
-                value_list.append(str(x))
+                value_list.append(str(round(x, 2)))
             correlation_payload[index] = value_list
 
         period_span = {"start_date": str(self.begin_year), "end_date": str(self.end_year)}

@@ -183,16 +183,18 @@ class WeatherCorrelation:
         count = 1
         for index, row in final_df.corr().iterrows():
             # print(index)
+            vals = str(round(row['kpivalue'], 2)), str(round(row['dew_point'], 2)), str(round(row['humidity'], 2)), str(round(row['temperature'], 2)), str(round(row['pressure'], 2))
+
             if count==1:
-                correlation_payload['kpivalue']=str(row['kpivalue']),  str(row['dew_point']),  str(row['humidity']),  str(row['temperature']),  str(row['pressure'])
+                correlation_payload['kpivalue']=vals
             elif count==2:
-                correlation_payload['dew_point']=str(row['kpivalue']),  str(row['dew_point']),  str(row['humidity']),  str(row['temperature']),  str(row['pressure'])
+                correlation_payload['dew_point']=vals
             elif count==3:
-                correlation_payload['humidity']=str(row['kpivalue']),  str(row['dew_point']),  str(row['humidity']),  str(row['temperature']),  str(row['pressure'])
+                correlation_payload['humidity']=vals
             elif count==4:
-                correlation_payload['temperature']=str(row['kpivalue']),  str(row['dew_point']),  str(row['humidity']),  str(row['temperature']),  str(row['pressure'])
+                correlation_payload['temperature']=vals
             elif count==5:
-                correlation_payload['pressure']= str(row['kpivalue']),  str(row['dew_point']),  str(row['humidity']),  str(row['temperature']),  str(row['pressure'])
+                correlation_payload['pressure']= vals
 
             count+=1
 
