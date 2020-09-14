@@ -74,7 +74,7 @@ class WeatherCorrelation:
                 indicator_meta['name'] = row[8]
                 indicator_meta['id'] = str(row[2])
                 indicator_meta['date_created'] = str(row[3])
-                indicator_meta['last_created'] = str(row[4])
+                indicator_meta['last_updated'] = str(row[4])
                 indicator_meta['description'] = row[5]
                 indicator_meta['source'] = "KHIS"
                 indic_meta_list.append(indicator_meta)
@@ -182,6 +182,7 @@ class WeatherCorrelation:
         correlation_payload = {'kpivalue': None,'dew_point': None,'humidity': None,'temperature': None,'pressure': None }
         count = 1
         for index, row in final_df.corr().iterrows():
+            # print(index)
             if count==1:
                 correlation_payload['kpivalue']=str(row['kpivalue']),  str(row['dew_point']),  str(row['humidity']),  str(row['temperature']),  str(row['pressure'])
             elif count==2:
