@@ -15,7 +15,7 @@ class IndicatorCorrelation:
         self.begin_year=2010
         self.end_year=2019
         self._db = db.database()
-        self.variables=[]
+        self.variables={}
 
     def set_max_min_period(self,orgunit_id,indictor_id):
         """Sets the begin and end period to query data based on availablility of data from the given indicator
@@ -69,7 +69,7 @@ class IndicatorCorrelation:
         for row in rows:
 
             if row[2] not in self.variables: # indicator name
-                self.variables.append(row[2])
+                self.variables[str(row[5])]=(row[2])
                 indicator_meta = {}
                 indicator_meta['name'] = row[2]
                 indicator_meta['id'] = str(row[5])

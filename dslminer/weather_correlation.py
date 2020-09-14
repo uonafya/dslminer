@@ -15,7 +15,7 @@ class WeatherCorrelation:
         self.begin_year=2010
         self.end_year=2019
         self._db = db.database()
-        self.variables=['temperature','dew point','humidity','pressure']
+        self.variables={}
 
     def set_max_min_period(self,orgunit_id,indictor_id):
         """Sets the begin and end period to query data based on availablility of data from the given indicator
@@ -70,7 +70,7 @@ class WeatherCorrelation:
         for row in rows:
             if(not is_indict_meta_initialized):
                 indicator_meta = {}
-                self.variables.append(row[8])
+                self.variables[str(row[2])]=str(row[8])
                 indicator_meta['name'] = row[8]
                 indicator_meta['id'] = str(row[2])
                 indicator_meta['date_created'] = str(row[3])
@@ -120,7 +120,8 @@ class WeatherCorrelation:
         colmns_indexes= {'dew point': 1, 'humidity': 2, 'temperature': 3, 'pressure': 4}
         weather_meta = {}
         for row in rows:
-
+            if row[3] not in self.variables:
+                self.variables[str(row[3])]=str(row[1])
             weather_meta[row[3]] =row[1]
             if(row[3] in weather_payload):
                 weather_val = {"date": str(row[0]), "value": str(row[2]), "ouid": str(row[4])}
