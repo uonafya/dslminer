@@ -2,6 +2,7 @@ from flask import Flask
 from flask import request
 from . import timeseries
 from . import weather_correlation
+from . import indicator_correlation
 import json
 app = Flask(__name__)
 
@@ -27,7 +28,7 @@ def do_indicator_timeseries(indicatorid):
     return data
 
 # weather correlation with indicator
-@app.route('/correlation/<indicatorid>/<orgunit>/',strict_slashes=False)
+@app.route('/weather_correlation/<indicatorid>/<orgunit>/',strict_slashes=False)
 def do_weather_correlation(indicatorid,orgunit):
     #23185,23408
     app.logger.info(indicatorid)
@@ -35,6 +36,21 @@ def do_weather_correlation(indicatorid,orgunit):
     p=weather_correlation.WeatherCorrelation()
     app.logger.debug("===weather correlation model started===")
     data=p.run_correlation(indicatorid,orgunit)
+
+    data=json.dumps(data)
+    return data
+
+
+# indicator to  indicator correlation
+@app.route('/indicator_correlation/<indicatorid>/<orgunit>/<indicator_list>/',strict_slashes=False)
+def do_indicator_correlation(indicatorid,orgunit,indicator_list):
+    #23185,23408
+    app.logger.info(indicatorid)
+    app.logger.info(orgunit)
+    app.logger.info(indicator_list)
+    p=indicator_correlation.IndicatorCorrelation()
+    app.logger.debug("===indicator-indicator correlation model started===")
+    data=p.run_correlation(indicatorid,orgunit,indicator_list)
 
     data=json.dumps(data)
     return data
