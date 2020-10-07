@@ -1,9 +1,10 @@
 import logging
 import matplotlib.pyplot as plt
 import pandas as pd
-from . import db
+import db
 from datetime import datetime
-
+from statsmodels.tsa.vector_ar.var_model import VAR
+from statsmodels.tsa.stattools import adfuller
 
 # configurations
 log = logging.getLogger("indicator correlation")
@@ -16,6 +17,7 @@ class IndicatorCorrelation:
         self.end_year=2019
         self._db = db.database()
         self.variables={}
+        self.stationarity_iterations_count = 0
 
     def set_max_min_period(self,orgunit_id,indictor_id):
         """Sets the begin and end period to query data based on availablility of data from the given indicator
@@ -168,5 +170,112 @@ class IndicatorCorrelation:
 
         return result
 
-# r=IndicatorCorrelation()
-# r.run_correlation(23185,23408,'23191,23701,31589')
+    '''
+        Makes given series (df_train) stationary to enable for timeseries analysis.
+    '''
+    def make_series_stationary(self, df_train):
+        # ADF Test on each column
+        for name, column in df_train.iteritems():
+            is_stationary = self.adfuller_test(column, name=column.name)
+            # print('\n')
+            if is_stationary == 0 and self.stationarity_iterations_count != 4:
+                df_train = df_train.diff().dropna()
+                self.stationarity_iterations_count = self.stationarity_iterations_count + 1
+                self.make_series_stationary(df_train)
+        return df_train
+
+    '''
+       implementation of Vector autoregression model for multivariate prediction analysis.
+    '''
+    def run_var_prediction(self,indicator_id,orgunit_id,compare_indicators):
+        # contrived dataset with dependency
+        correlation_dimension = []
+        correlation_payload = {}
+        compare_indicators = str(indicator_id) + ',' + compare_indicators
+        self.set_max_min_period(orgunit_id, indicator_id)
+        indic_data = self.get_indicator_data(orgunit_id, compare_indicators)
+        indicator_df = indic_data[0]
+        indicator_df = indicator_df.fillna(indicator_df.mean()) # fill NaN with averages.
+
+        #we split the data frame to training and test series
+        nobs = 4
+        df_train, df_test = indicator_df[0:-nobs], indicator_df[-nobs:]
+        # Check size
+        # print(df_train.shape)  # (119, 8)
+        # print(df_test.shape)  # (4, 8)
+
+        #make the series stationary
+        df_differenced= self.make_series_stationary(df_train)
+
+        model = VAR(df_differenced)
+
+        # fit model
+        model_fitted = model.fit()
+
+        # Get the lag order
+        lag_order = model_fitted.k_ar
+
+        # Input data for forecasting
+        forecast_input = df_differenced.values[-lag_order:]
+
+        # Forecast
+        fc = model_fitted.forecast(y=forecast_input, steps=50)
+
+        df_forecast = pd.DataFrame(fc, columns=indicator_df.columns)
+        df_results = self.invert_transformation(df_train, df_forecast)
+        print(fc)
+        print("============")
+        print(indicator_df)
+        print("============")
+
+
+    def invert_transformation(self,df_train, df_forecast):
+        """Revert back the differencing to get the forecast to original scale."""
+        df_fc = df_forecast.copy()
+        columns = df_train.columns
+        for col in columns:
+            # Roll back Diff value
+            if self.stationarity_iterations_count==1:
+                # Roll back 1st Diff
+                df_fc[str(col)] = df_train[col].iloc[-1] + df_fc[str(col)].cumsum()
+            elif  self.stationarity_iterations_count>1:
+                for i in range(self.stationarity_iterations_count,1,-1):
+                    df_fc[str(col)] = (df_train[col].iloc[-i] - df_train[col].iloc[-(i+1)]) + df_fc[str(col)].cumsum()
+                    if i==1:
+                        df_fc[str(col)] = df_train[col].iloc[-1] + df_fc[str(col)].cumsum()
+
+
+        return df_fc
+
+    def adfuller_test(self,series, signif=0.05, name='', verbose=False):
+        """Perform ADFuller to test for Stationarity of given series and print report"""
+        r = adfuller(series, autolag='AIC')
+        output = {'test_statistic': round(r[0], 4), 'pvalue': round(r[1], 4), 'n_lags': round(r[2], 4), 'n_obs': r[3]}
+        p_value = output['pvalue']
+
+        def adjust(val, length=6):
+            return str(val).ljust(length)
+
+        # Print Summary
+        print(f'    Augmented Dickey-Fuller Test on "{name}"', "\n   ", '-' * 47)
+        print(f' Null Hypothesis: Data has unit root. Non-Stationary.')
+        print(f' Significance Level    = {signif}')
+        print(f' Test Statistic        = {output["test_statistic"]}')
+        print(f' No. Lags Chosen       = {output["n_lags"]}')
+
+        for key, val in r[4].items():
+            print(f' Critical value {adjust(key)} = {round(val, 3)}')
+
+        if p_value <= signif:
+            print(f" => P-Value = {p_value}. Rejecting Null Hypothesis.")
+            print(f" => Series is Stationary.")
+            return 0
+        else:
+            print(f" => P-Value = {p_value}. Weak evidence to reject the Null Hypothesis.")
+            print(f" => Series is Non-Stationary.")
+            return 1
+
+
+r=IndicatorCorrelation()
+# r.run_var_prediction(23185,23408,'23191,23701,31589')
+r.run_var_prediction(93299,23408,'32954,2449433') #,2449433,93323
