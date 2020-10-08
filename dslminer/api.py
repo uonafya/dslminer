@@ -68,3 +68,17 @@ def do_indicator_indicator_forecast(indicatorid,orgunit,indicator_list,period_ra
 
     data=json.dumps(data)
     return data
+
+# indicator to  indicator correlation ==
+@app.route('/indicator_weather_forecast/<indicatorid>/<orgunit>/<weather_id>/<period_range>/',strict_slashes=False)
+def do_multivariate_prediction(indicatorid,orgunit,weather_id,period_range):
+    #23185,23408
+    app.logger.info(indicatorid)
+    app.logger.info(orgunit)
+    app.logger.info(weather_id)
+    p=weather_correlation.WeatherCorrelation()
+    app.logger.debug("===indicator-weather forecast analysis===")
+    data=p.do_multivariate_prediction(indicatorid,orgunit,weather_id,period_range)
+
+    data=json.dumps(data)
+    return data
