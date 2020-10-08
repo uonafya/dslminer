@@ -1,10 +1,12 @@
 import logging
 import matplotlib.pyplot as plt
 import pandas as pd
-import db
+from . import db
 from datetime import datetime
 from statsmodels.tsa.vector_ar.var_model import VAR
 from statsmodels.tsa.stattools import adfuller
+import datetime
+import math
 
 # configurations
 log = logging.getLogger("indicator correlation")
@@ -71,7 +73,7 @@ class IndicatorCorrelation:
         for row in rows:
 
             if row[2] not in self.variables: # indicator name
-                self.variables[str(row[5])]=(row[2])
+                self.variables[str(row[2])]=row[2]
                 indicator_meta = {}
                 indicator_meta['name'] = row[2]
                 indicator_meta['id'] = str(row[5])
@@ -187,10 +189,8 @@ class IndicatorCorrelation:
     '''
        implementation of Vector autoregression model for multivariate prediction analysis.
     '''
-    def run_var_prediction(self,indicator_id,orgunit_id,compare_indicators):
-        # contrived dataset with dependency
-        correlation_dimension = []
-        correlation_payload = {}
+    def run_var_prediction(self,indicator_id,orgunit_id,compare_indicators,time_range):
+
         compare_indicators = str(indicator_id) + ',' + compare_indicators
         self.set_max_min_period(orgunit_id, indicator_id)
         indic_data = self.get_indicator_data(orgunit_id, compare_indicators)
@@ -206,9 +206,7 @@ class IndicatorCorrelation:
 
         #make the series stationary
         df_differenced= self.make_series_stationary(df_train)
-
         model = VAR(df_differenced)
-
         # fit model
         model_fitted = model.fit()
 
@@ -218,15 +216,14 @@ class IndicatorCorrelation:
         # Input data for forecasting
         forecast_input = df_differenced.values[-lag_order:]
 
+        print(forecast_input)
         # Forecast
-        fc = model_fitted.forecast(y=forecast_input, steps=50)
+        forecast_data = model_fitted.forecast(y=forecast_input, steps=time_range)
 
-        df_forecast = pd.DataFrame(fc, columns=indicator_df.columns)
-        df_results = self.invert_transformation(df_train, df_forecast)
-        print(fc)
-        print("============")
-        print(indicator_df)
-        print("============")
+        df_forecast = pd.DataFrame(forecast_data, columns=indicator_df.columns)
+        predicted_results = self.invert_transformation(df_train, df_forecast)
+
+        return (predicted_results,indic_data)
 
 
     def invert_transformation(self,df_train, df_forecast):
@@ -275,7 +272,49 @@ class IndicatorCorrelation:
             print(f" => Series is Non-Stationary.")
             return 1
 
+    def do_multivariate_prediction(self,indicator_id,orgunit_id,compare_indicators,time_range):
+        time_range = int(time_range)
+        # indic_data = final_df,indic_payload_values,indic_meta_list,org_meta_list
+        # var_data = predicted_results,indic_data
+        var_data = self.run_var_prediction(indicator_id,orgunit_id,compare_indicators,time_range)
+        end_forecast_date =var_data[1][0].index[-1] + datetime.timedelta(days=time_range)
+        start_forecast_date = var_data[1][0].index[-1] + datetime.timedelta(days=1)
+        var_data[0].insert(0, "date", pd.date_range(start_forecast_date, end_forecast_date)) # concate new predicted dates into generated forecast values.
+        predicted_dataframe = var_data[0].set_index("date")
+        final_data = pd.concat([var_data[1][0], predicted_dataframe])
+        period_span = {"start_date": str(self.begin_year), "end_date": str(self.end_year)}
+        print("================")
+        indicator_column = '%s' %indicator_id
+        forecast_payload_values = {}
+        forecast_payload_values[indicator_column] = []
+        for items in predicted_dataframe[indicator_column].iteritems():
+            indict_list = forecast_payload_values[indicator_column]
+            indic_val = {"date": str(items[0].date()), "value": str(round(items[1],2)), "ouid": str(orgunit_id)}
+            indict_list.append(indic_val)
 
-r=IndicatorCorrelation()
-# r.run_var_prediction(23185,23408,'23191,23701,31589')
-r.run_var_prediction(93299,23408,'32954,2449433') #,2449433,93323
+        # assemble result
+        dictionary = {
+            "analyses": {
+                "period_span": period_span,
+                "precition_model": "Vector Autoregression",
+                "period_type": "monthly",
+                "variables": self.variables
+            },
+            "orgunits": var_data[1][3],
+            "indicators": var_data[1][2]
+        }
+        data = {
+            "indicator": var_data[1][1],
+            "forecast_values":forecast_payload_values
+        }
+        result = {"dictionary": dictionary, "data": data}
+        print (result)
+        return result
+
+        # print(pd.date_range(var_data[1][0].index[-1], x)+ var_data[0])
+
+
+
+# r=IndicatorCorrelation()
+# r.do_multivariate_prediction(23185,23408,'23191,23701,31589',10)
+# r.run_var_prediction(93299,23408,'32954,2449433',10) #,2449433,93323
