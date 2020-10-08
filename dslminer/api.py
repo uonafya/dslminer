@@ -54,3 +54,17 @@ def do_indicator_correlation(indicatorid,orgunit,indicator_list):
 
     data=json.dumps(data)
     return data
+
+# indicator to  indicator correlation
+@app.route('/indicator_forecast/<indicatorid>/<orgunit>/<indicator_list>/<period_range>/',strict_slashes=False)
+def do_indicator_indicator_forecast(indicatorid,orgunit,indicator_list,period_range):
+    #23185,23408
+    app.logger.info(indicatorid)
+    app.logger.info(orgunit)
+    app.logger.info(indicator_list)
+    p=indicator_correlation.IndicatorCorrelation()
+    app.logger.debug("===indicator-indicator forecast analysis===")
+    data=p.do_multivariate_prediction(indicatorid,orgunit,indicator_list,period_range)
+
+    data=json.dumps(data)
+    return data
