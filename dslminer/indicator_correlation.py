@@ -39,7 +39,7 @@ class IndicatorCorrelation:
                     FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"='''+str(indictor_id)+''' and "Org unit id"='''+str(orgunit_id)
 
         cursor = self._db.get_db_con()[1]
-        print(max_min_period)
+        log.info(max_min_period)
         cursor.execute(max_min_period)
         row = cursor.fetchall()
         log.info("============================")
@@ -59,7 +59,7 @@ class IndicatorCorrelation:
                     "Indicator ID" as indicator_id ,  _datecreated , lastupdated , "Indicator description"  
                     FROM public.vw_mohdsl_dhis_indicators where "Indicator ID" in (%s) and "Org unit id"=%s and startdate>='%s' and enddate<='%s' order by startdate asc''' % (
         compare_indicators,ouid,str(self.begin_year)+"-01-01", str(self.end_year)+"-12-31" )
-        print(query_string)
+        log.info(query_string)
         columns = ["date", "indicator"]
         cursor = self._db.get_db_con()[1]
         cursor.execute(query_string)
@@ -200,9 +200,6 @@ class IndicatorCorrelation:
         #we split the data frame to training and test series
         nobs = 4
         df_train, df_test = indicator_df[0:-nobs], indicator_df[-nobs:]
-        # Check size
-        # print(df_train.shape)  # (119, 8)
-        # print(df_test.shape)  # (4, 8)
 
         #make the series stationary
         df_differenced= self.make_series_stationary(df_train)
@@ -216,7 +213,6 @@ class IndicatorCorrelation:
         # Input data for forecasting
         forecast_input = df_differenced.values[-lag_order:]
 
-        print(forecast_input)
         # Forecast
         forecast_data = model_fitted.forecast(y=forecast_input, steps=time_range)
 
@@ -308,11 +304,7 @@ class IndicatorCorrelation:
             "forecast_values":forecast_payload_values
         }
         result = {"dictionary": dictionary, "data": data}
-        print (result)
         return result
-
-        # print(pd.date_range(var_data[1][0].index[-1], x)+ var_data[0])
-
 
 
 # r=IndicatorCorrelation()
