@@ -70,10 +70,11 @@ class IndicatorCorrelation:
         org_meta_list = []
         indic_payload_values = {}
         added_org_units = []
+        added_indics = {}
         for row in rows:
 
-            if row[2] not in self.variables: # indicator name
-                self.variables[str(row[2])]=row[2]
+            if row[2] not in added_indics: # indicator name
+                self.variables[str(row[5])]=row[2]
                 indicator_meta = {}
                 indicator_meta['name'] = row[2]
                 indicator_meta['id'] = str(row[5])
@@ -82,7 +83,7 @@ class IndicatorCorrelation:
                 indicator_meta['description'] = row[8]
                 indicator_meta['source'] = "KHIS"
                 indic_meta_list.append(indicator_meta)
-
+                added_indics[str(row[2])] = row[2]
             if row[4] not in added_org_units:
                 orgunit_meta = {}
                 orgunit_meta['name'] = row[3]
