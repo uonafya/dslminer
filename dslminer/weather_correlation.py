@@ -36,7 +36,7 @@ class WeatherCorrelation:
                 void
                 """
         max_min_period=''' SELECT  date_part('year',max(startdate)) as mx, date_part('year',min(startdate)) as mn
-                    FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"='''+str(indictor_id)+''' and "Org unit id"='''+str(orgunit_id)
+                    FROM public.vw_mohdsl_dhis_indicators where "Indicator ID"='''+str(indictor_id)+''' and "Org unit id"='''+str(orgunit_id)+ ''' and startdate>'2009-12-31' '''
 
         cursor = self._db.get_db_con()[1]
         log.info(max_min_period)
@@ -361,10 +361,9 @@ class WeatherCorrelation:
         # var_data = predicted_results,indic_data
         var_data = self.run_var_prediction(indicator_id,orgunit_id, weather_id, time_range)
         var_dat=var_data[1][0].set_index("startdate")
-        end_forecast_date = var_dat.index[-1] + datetime.timedelta(days=time_range)
+        # end_forecast_date = var_dat.index[-1] + datetime.timedelta(days=time_range)
         start_forecast_date = var_dat.index[-1] + datetime.timedelta(days=1)
-        var_data[0].insert(0, "date", pd.date_range(start_forecast_date,
-                                                    end_forecast_date))  # concate new predicted dates into generated forecast values.
+        var_data[0].insert(0, "date", pd.date_range(start=start_forecast_date, periods=time_range, freq='MS'))
         predicted_dataframe = var_data[0].set_index("date")
         final_data = pd.concat([var_data[1][0], predicted_dataframe])
         period_span = {"start_date": str(self.begin_year), "end_date": str(self.end_year)}
