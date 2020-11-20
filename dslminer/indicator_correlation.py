@@ -1,16 +1,15 @@
 import logging
 import pandas as pd
 import db
-from datetime import datetime
 import datetime
 from sklearn import linear_model
 from fbprophet import Prophet
 from dateutil.relativedelta import *
 import numpy
 
-# configurations
 from utils import diff_month
 
+# configurations
 log = logging.getLogger("indicator correlation")
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',level=logging.DEBUG)
 
@@ -220,10 +219,11 @@ class IndicatorCorrelation:
         for indic_id in max_indicator_dates:
             if (indic_id != indicator_id):
                 forecasted_indepn_var=self.forecast_independent_variable(indic_id, indicator_id, time_range, max_indicator_dates, indicator_df)
+                forecasted_indepn_var=forecasted_indepn_var.rename(columns={'value': indic_id})
+                # forecasted_indepn_var.rename(columns={'value': indic_id}, inplace=True)
                 indipendent_variable.append(forecasted_indepn_var)
 
         indicator_df.fillna(indicator_df.mean(),inplace=True)  # fill NaN with averages.
-
         indicator_colmn = '%s' % indicator_id
         indicator_df[indicator_colmn].index = pd.DatetimeIndex(indicator_df[indicator_colmn].index)
 
@@ -238,12 +238,12 @@ class IndicatorCorrelation:
                     if len(independent_variables_vals) != len(indipendent_variable): # create list for each indicators data
                         independent_variables_vals.append([])
 
-                    independent_variables_vals[data_frame_no].append(indipendent_variable[data_frame_no].value[x])
+                    independent_variables_vals[data_frame_no].append(indipendent_variable[data_frame_no].values[x][0])
                 independ_correlation_count = independ_correlation_count - 1
             else:
                 independent_predicted_vals.append([])
                 for data_frame_no in range(len(indipendent_variable)):
-                    independent_predicted_vals[correlation_arr_counter].append(indipendent_variable[data_frame_no].value[x])
+                    independent_predicted_vals[correlation_arr_counter].append(indipendent_variable[data_frame_no].values[x][0])
                 correlation_arr_counter = correlation_arr_counter + 1
 
         strt_date = str(self.begin_year) + "-01-01"
@@ -271,7 +271,7 @@ class IndicatorCorrelation:
         #, columns=indicator_df.columns
         df_forecast = pd.DataFrame(forecast_data)
 
-        return (df_forecast,indic_data)
+        return (df_forecast,indic_data,indipendent_variable,max_indicator_dates)
 
 
     '''
@@ -288,21 +288,30 @@ class IndicatorCorrelation:
 
     def do_multivariate_prediction(self,indicator_id,orgunit_id,compare_indicators,time_range):
         time_range = int(time_range)
-        # indic_data = final_df,indic_payload_values,indic_meta_list,org_meta_list
-        # var_data = predicted_results,indic_data
         indicator_id =int(indicator_id)
         var_data = self.run_var_prediction(indicator_id,orgunit_id,compare_indicators,time_range)
-        # end_forecast_date =var_data[1][0].index[-1] + datetime.timedelta(days=time_range)
         start_forecast_date = var_data[1][0].index[-1] + datetime.timedelta(days=1)
 
-        var_data[0].insert(0, "date", pd.date_range(start = start_forecast_date, periods=time_range, freq= 'MS')) # generate new time periods for forecast data.
+        forecast_payload_values = {}
+        for independent_var_df in var_data[2]:
+            max_indicator_dates = var_data[3]
 
+            indepn_indic_id = independent_var_df.columns[0]
+            independent_var_df=independent_var_df.round(decimals=2)
+            forecast_payload_values[str(indepn_indic_id)] =[]
+
+            for index, row  in independent_var_df[max_indicator_dates[indepn_indic_id]+relativedelta(months=+1):].iterrows():
+                indict_list = forecast_payload_values[str(indepn_indic_id)]
+                date_time = index.strftime("%Y-%m-%d")
+                indic_val = {"date": date_time, "value": str(list(row)[0]), "ouid": str(orgunit_id)}
+                indict_list.append(indic_val)
+
+        var_data[0].insert(0, "date", pd.date_range(start = start_forecast_date, periods=time_range, freq= 'MS')) # generate new time periods for forecast data.
         predicted_dataframe = var_data[0].set_index("date")
-        # final_data = pd.concat([var_data[1][0], predicted_dataframe])
-        final_data = var_data[1][0]
         period_span = {"start_date": str(self.begin_year), "end_date": str(self.end_year)}
         indicator_column = '%s' %indicator_id
-        forecast_payload_values = {}
+
+
         forecast_payload_values[indicator_column] = []
 
         for index, row in predicted_dataframe.iterrows():
