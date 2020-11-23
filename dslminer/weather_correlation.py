@@ -1,8 +1,9 @@
 import logging
 import json
+from builtins import int
+
 import pandas as pd
-from . import db
-from datetime import datetime
+import db
 from statsmodels.tsa.vector_ar.var_model import VAR
 from statsmodels.tsa.stattools import adfuller
 import datetime
@@ -20,6 +21,8 @@ class WeatherCorrelation:
         self._db = db.database()
         self.variables={}
         self.stationarity_iterations_count = 0
+        self.max_indicator_dates = {}
+        self._indicator_id= None
 
     def set_max_min_period(self,orgunit_id,indictor_id):
         """Sets the begin and end period to query data based on availablility of data from the given indicator
@@ -104,6 +107,10 @@ class WeatherCorrelation:
                 indic_val = {"date": str(row[0]), "value": str(row[1]), "ouid": str(row[7])}
                 indict_list.append(indic_val)
 
+            if (row[0] != None):
+                self.max_indicator_dates[indicatorid] = row[0]
+        print("maximum dates =======>")
+        print(self.max_indicator_dates)
         indicator_df = pd.DataFrame(indic_frame_values)
 
         return (indicator_df,indic_payload_values,indic_meta_list,org_meta_list)
@@ -116,9 +123,9 @@ class WeatherCorrelation:
 
         query_string = '''select distinct  TO_DATE(year || '-' || month  || '-' || 01, 'YYYY-MM-DD') as startdate, weather_type, ROUND(value,3),w_type_id, org_id from
                           (select avg(value) as value,EXTRACT(month from period) as month,EXTRACT(year from period) as year, org_id,weather_type,w_type_id
-                          from weather_comm_org_unit where org_id =%s and period>='%s' and period<='%s' and w_type_id %s 
+                          from weather_comm_org_unit where org_id =%s and period>='%s' and w_type_id %s 
                           group by org_id,w_type_id,EXTRACT(month from period),EXTRACT(year from period),weather_type) as weather order by startdate asc ''' % (
-                          ouid, str(self.begin_year) + "-01-01", str(self.end_year) + "-12-31",weather_rep)
+                          ouid, str(self.begin_year) + "-01-01" ,weather_rep)
         data_list = []
         columns = ['startdate', 'dew_point', 'humidity', 'temperature', 'pressure']
         cursor = self._db.get_db_con()[1]
@@ -126,32 +133,46 @@ class WeatherCorrelation:
         cursor.execute(query_string)
         rows = cursor.fetchall()
         weather_data = {} #date: ['date','dew point','humidity','temperature','pressure']
+        data_above_indicator_last = {} #date: ['date','dew point','humidity','temperature','pressure']
         weather_payload = {}
         colmns_indexes= {'dew point': 1, 'humidity': 2, 'temperature': 3, 'pressure': 4}
         weather_meta = {}
+
+        end_date = str(self.end_year)+"-12-31"
         for row in rows:
-            if row[3] not in self.variables:
-                self.variables[str(row[3])]=str(row[1])
-            weather_meta[row[3]] =row[1]
-            if(row[3] in weather_payload):
-                weather_val = {"date": str(row[0]), "value": str(row[2]), "ouid": str(row[4])}
-                weather_payload[row[3]].append(weather_val)
-            else:
-                weather_payload[row[3]]=[]
-                weather_val = {"date": str(row[0]), "value": str(row[2]),  "ouid": str(row[4])}
-                weather_payload[row[3]].append(weather_val)
+            if row[0] < self.max_indicator_dates[self._indicator_id]:
+                if row[3] not in self.variables:
+                    self.variables[str(row[3])]=str(row[1])
+                weather_meta[row[3]] =row[1]
+                if(row[3] in weather_payload):
+                    weather_val = {"date": str(row[0]), "value": str(row[2]), "ouid": str(row[4])}
+                    weather_payload[row[3]].append(weather_val)
+                else:
+                    weather_payload[row[3]]=[]
+                    weather_val = {"date": str(row[0]), "value": str(row[2]),  "ouid": str(row[4])}
+                    weather_payload[row[3]].append(weather_val)
 
 
-            start_dt = row[0]
-            if row[1] == 'precipitation':
-                continue
-            if(start_dt in weather_data):
-                weather_data[start_dt][colmns_indexes[row[1]]] = row[2]
-                weather_data[start_dt][0] = start_dt
+                start_dt = row[0]
+                if row[1] == 'precipitation': # we do not analyse precipitation as all data reads 0 in db
+                    continue
+                if(start_dt in weather_data):
+                    weather_data[start_dt][colmns_indexes[row[1]]] = row[2]
+                    weather_data[start_dt][0] = start_dt
+                else:
+                    weather_data[start_dt] = [None,None,None,None,None]
+                    weather_data[start_dt][colmns_indexes[row[1]]] = row[2]
+                    weather_data[start_dt][0] = start_dt
             else:
-                weather_data[start_dt] = [None,None,None,None,None]
-                weather_data[start_dt][colmns_indexes[row[1]]] = row[2]
-                weather_data[start_dt][0] = start_dt
+                start_dt = row[0]
+                if row[1] == 'precipitation':
+                    continue
+                if (start_dt in data_above_indicator_last):
+                    data_above_indicator_last[start_dt][colmns_indexes[row[1]]-1] = row[2]
+                else:
+                    data_above_indicator_last[start_dt] = [None, None, None, None]
+                    data_above_indicator_last[start_dt][colmns_indexes[row[1]]-1] = row[2]
+
 
         for key in weather_data:
             data_list.append(weather_data[key])
@@ -159,8 +180,9 @@ class WeatherCorrelation:
         # Create the pandas DataFrame
         weather_df = pd.DataFrame(data_list, columns=columns)
         # log.info(weather_df.head())
-
-        return (weather_df,weather_payload,weather_meta)
+        print("returning")
+        print(data_above_indicator_last)
+        return (weather_df,weather_payload,weather_meta,data_above_indicator_last)
 
 
     def run_correlation(self,indicator_id,orgunit_id):
@@ -253,12 +275,11 @@ class WeatherCorrelation:
 
     def run_var_prediction(self, indicator_id,orgunit_id, weather_id, time_range):
 
+        self.set_max_min_period(orgunit_id, indicator_id)
+        indic_data = self.get_indicator_data(orgunit_id, indicator_id)
         weather_data = self.get_weather_by_year(orgunit_id,weather_id=weather_id)
         weather_df = weather_data[0]
 
-        compare_indicators = str(indicator_id)
-        self.set_max_min_period(orgunit_id, indicator_id)
-        indic_data = self.get_indicator_data(orgunit_id,indicator_id)
         indicator_df = indic_data[0]
         indicator_df = indicator_df.fillna(indicator_df.mean())  # fill NaN with averages.
 
@@ -357,6 +378,7 @@ class WeatherCorrelation:
     def do_multivariate_prediction(self, indicator_id,orgunit_id, weather_id, time_range):
         time_range = int(time_range)
         weather_id= int(weather_id)
+        self._indicator_id = indicator_id
         # indic_data = final_df,indic_payload_values,indic_meta_list,org_meta_list
         # var_data = predicted_results,indic_data
         var_data = self.run_var_prediction(indicator_id,orgunit_id, weather_id, time_range)
@@ -394,5 +416,5 @@ class WeatherCorrelation:
         result = {"dictionary": dictionary, "data": data}
         return result
 
-# r=WeatherCorrelation()
-# r.do_multivariate_prediction(23185,23408,2,10)
+r=WeatherCorrelation()
+r.do_multivariate_prediction(23185,23408,2,10)
