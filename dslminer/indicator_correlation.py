@@ -205,7 +205,7 @@ class IndicatorCorrelation:
 
 
     '''
-       implementation of Vector autoregression model for multivariate prediction analysis.
+       implementation of model for multivariate prediction analysis.
     '''
     def run_var_prediction(self,indicator_id,orgunit_id,compare_indicators,time_range):
 
