@@ -5,9 +5,12 @@ from builtins import int
 import pandas as pd
 import db
 from statsmodels.tsa.vector_ar.var_model import VAR
-from statsmodels.tsa.stattools import adfuller
+from dateutil.relativedelta import *
 import datetime
-import math
+from sklearn import linear_model
+from fbprophet import Prophet
+
+from utils import months_between
 
 # configurations
 log = logging.getLogger("weather correlation")
@@ -22,6 +25,7 @@ class WeatherCorrelation:
         self.variables={}
         self.stationarity_iterations_count = 0
         self.max_indicator_dates = {}
+        self.max_weather_dates = {}
         self._indicator_id= None
 
     def set_max_min_period(self,orgunit_id,indictor_id):
@@ -127,6 +131,7 @@ class WeatherCorrelation:
                           group by org_id,w_type_id,EXTRACT(month from period),EXTRACT(year from period),weather_type) as weather order by startdate asc ''' % (
                           ouid, str(self.begin_year) + "-01-01" ,weather_rep)
         data_list = []
+        data_list_above_indicator_last = []
         columns = ['startdate', 'dew_point', 'humidity', 'temperature', 'pressure']
         cursor = self._db.get_db_con()[1]
         log.info(query_string)
@@ -165,24 +170,29 @@ class WeatherCorrelation:
                     weather_data[start_dt][0] = start_dt
             else:
                 start_dt = row[0]
+                self.max_weather_dates[row[3]] = start_dt
                 if row[1] == 'precipitation':
                     continue
                 if (start_dt in data_above_indicator_last):
-                    data_above_indicator_last[start_dt][colmns_indexes[row[1]]-1] = row[2]
+                    data_above_indicator_last[start_dt][colmns_indexes[row[1]]] = row[2]
+                    data_above_indicator_last[start_dt][0] = start_dt
                 else:
-                    data_above_indicator_last[start_dt] = [None, None, None, None]
-                    data_above_indicator_last[start_dt][colmns_indexes[row[1]]-1] = row[2]
+                    data_above_indicator_last[start_dt] = [None, None, None, None, None]
+                    data_above_indicator_last[start_dt][colmns_indexes[row[1]]] = row[2]
+                    data_above_indicator_last[start_dt][0] = start_dt
 
 
         for key in weather_data:
             data_list.append(weather_data[key])
 
+        for key in data_above_indicator_last:
+            data_list_above_indicator_last.append(data_above_indicator_last[key])
+
         # Create the pandas DataFrame
         weather_df = pd.DataFrame(data_list, columns=columns)
+        data_list_above_indicator_last_df =pd.DataFrame(data_list_above_indicator_last, columns=columns )
         # log.info(weather_df.head())
-        print("returning")
-        print(data_above_indicator_last)
-        return (weather_df,weather_payload,weather_meta,data_above_indicator_last)
+        return (weather_df,weather_payload,weather_meta,data_list_above_indicator_last_df)
 
 
     def run_correlation(self,indicator_id,orgunit_id):
@@ -255,29 +265,58 @@ class WeatherCorrelation:
         return result
 
     '''
-            Makes given series (df_train) stationary to enable for timeseries analysis.
-        '''
-
-    def make_series_stationary(self, df_train):
-        # ADF Test on each column
-        for name, column in df_train.iteritems():
-            is_stationary = self.adfuller_test(column, name=column.name)
-            if is_stationary == 0 and self.stationarity_iterations_count != 4:
-
-                df_train = df_train.diff().dropna()
-                self.stationarity_iterations_count = self.stationarity_iterations_count + 1
-                self.make_series_stationary(df_train)
-        return df_train
+        projects missing values from given series data
+    '''
+    def fill_missing_vals(self,series, leap):
+        log.info("filling forecast data")
+        print(series.head())
+        m = Prophet()
+        series.columns = ['ds','y']
+        m.fit(series)
+        future = m.make_future_dataframe(periods=leap, freq='M',include_history = False)
+        forecast = m.predict(future)
+        return forecast
 
     '''
-       implementation of Vector autoregression model for multivariate prediction analysis.
+       implementation of multivariate prediction analysis.
     '''
-
     def run_var_prediction(self, indicator_id,orgunit_id, weather_id, time_range):
-
+        wther_dict = {2: 'dew_point', 3: 'humidity',1: 'temperature',5: 'pressure'}
         self.set_max_min_period(orgunit_id, indicator_id)
         indic_data = self.get_indicator_data(orgunit_id, indicator_id)
         weather_data = self.get_weather_by_year(orgunit_id,weather_id=weather_id)
+        #return (weather_df,weather_payload,weather_meta,data_list_above_indicator_last_df)
+        #concant weather df with extra data up to the date from last indicator update + time_range
+
+        columns_to_drop = [wther_condition for wther_condition in ['dew_point', 'humidity', 'temperature', 'pressure'] if wther_condition!=wther_dict[weather_id]]
+        wther_upto_indicator_date = weather_data[0]
+        wther_aftr_indicator_available=weather_data[3]
+        log.info("columns to drop in data frame")
+        log.info(columns_to_drop)
+
+        wther_upto_indicator_date=wther_upto_indicator_date.drop(columns=columns_to_drop)
+        wther_aftr_indicator_available=wther_aftr_indicator_available.drop(columns=columns_to_drop)
+
+        wther_upto_indicator_date=wther_upto_indicator_date.set_index('startdate',drop=True)
+        wther_aftr_indicator_available=wther_aftr_indicator_available.set_index('startdate',drop=True)
+
+        weather_df_to_concant = []
+        weather_df_to_concant.append(wther_upto_indicator_date)
+        weather_df_to_concant.append(wther_aftr_indicator_available)
+
+        wether_df = pd.concat(weather_df_to_concant)
+        log.info("concatenated df  === >")
+        log.info(wether_df.tail(30))
+        
+
+        last_date_forecast = self.max_indicator_dates[indicator_id] + relativedelta(months=+time_range)
+        last_weather_forecast_diff =months_between(last_date_forecast, self.max_weather_dates[weather_id])
+        if last_weather_forecast_diff>0: # forecast weather data if date of last predict higher than available data
+            forecasted_indepn_var = self.fill_missing_vals(wether_df,last_weather_forecast_diff)
+            #forecasted_indepn_var = forecasted_indepn_var.rename(columns={'value': weather_id})
+        else:
+            wether_df=wether_df.truncate(after=last_date_forecast) #if data has more data that last indicator date data available, truncante
+
         weather_df = weather_data[0]
 
         indicator_df = indic_data[0]
@@ -330,50 +369,6 @@ class WeatherCorrelation:
         predicted_results = self.invert_transformation(df_train, df_forecast)
         return (predicted_results, indic_data)
 
-    def invert_transformation(self, df_train, df_forecast):
-        """Revert back the differencing to get the forecast to original scale."""
-        df_fc = df_forecast.copy()
-        columns = df_train.columns
-        for col in columns:
-            # Roll back Diff value
-            if self.stationarity_iterations_count == 1:
-                # Roll back 1st Diff
-                df_fc[str(col)] = df_train[col].iloc[-1] + df_fc[str(col)].cumsum()
-            elif self.stationarity_iterations_count > 1:
-                for i in range(self.stationarity_iterations_count, 1, -1):
-                    df_fc[str(col)] = (df_train[col].iloc[-i] - df_train[col].iloc[-(i + 1)]) + df_fc[str(col)].cumsum()
-                    if i == 1:
-                        df_fc[str(col)] = df_train[col].iloc[-1] + df_fc[str(col)].cumsum()
-
-        return df_fc
-
-    def adfuller_test(self, series, signif=0.05, name='', verbose=False):
-        """Perform ADFuller to test for Stationarity of given series and print report"""
-        r = adfuller(series, autolag='AIC')
-        output = {'test_statistic': round(r[0], 4), 'pvalue': round(r[1], 4), 'n_lags': round(r[2], 4), 'n_obs': r[3]}
-        p_value = output['pvalue']
-
-        def adjust(val, length=6):
-            return str(val).ljust(length)
-
-        # Print Summary
-        print(f'    Augmented Dickey-Fuller Test on "{name}"', "\n   ", '-' * 47)
-        print(f' Null Hypothesis: Data has unit root. Non-Stationary.')
-        print(f' Significance Level    = {signif}')
-        print(f' Test Statistic        = {output["test_statistic"]}')
-        print(f' No. Lags Chosen       = {output["n_lags"]}')
-
-        for key, val in r[4].items():
-            print(f' Critical value {adjust(key)} = {round(val, 3)}')
-
-        if p_value <= signif:
-            print(f" => P-Value = {p_value}. Rejecting Null Hypothesis.")
-            print(f" => Series is Stationary.")
-            return 0
-        else:
-            print(f" => P-Value = {p_value}. Weak evidence to reject the Null Hypothesis.")
-            print(f" => Series is Non-Stationary.")
-            return 1
 
     def do_multivariate_prediction(self, indicator_id,orgunit_id, weather_id, time_range):
         time_range = int(time_range)
