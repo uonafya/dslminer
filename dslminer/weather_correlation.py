@@ -1,14 +1,13 @@
 import logging
-import json
 from builtins import int
 
 import pandas as pd
 import db
-from statsmodels.tsa.vector_ar.var_model import VAR
 from dateutil.relativedelta import *
 import datetime
 from sklearn import linear_model
 from fbprophet import Prophet
+import numpy
 
 from utils import months_between
 
@@ -196,6 +195,7 @@ class WeatherCorrelation:
 
 
     def run_correlation(self,indicator_id,orgunit_id):
+        self._indicator_id=indicator_id
         self.set_max_min_period(orgunit_id,indicator_id)
 
         indic_data = self.get_indicator_data(orgunit_id, indicator_id)
@@ -264,18 +264,60 @@ class WeatherCorrelation:
 
         return result
 
+
     '''
         projects missing values from given series data
     '''
     def fill_missing_vals(self,series, leap):
-        log.info("filling forecast data")
-        print(series.head())
+        series=series.reset_index()
         m = Prophet()
         series.columns = ['ds','y']
         m.fit(series)
         future = m.make_future_dataframe(periods=leap, freq='M',include_history = False)
         forecast = m.predict(future)
         return forecast
+
+
+    '''
+        forecast weather data needed for predicition if need be
+    '''
+    def _forecast_independent_variable(self,last_weather_forecast_diff,wether_df,weather_id,last_date_forecast):
+        if last_weather_forecast_diff>0: # forecast weather data if date of last predict higher than available data
+            forecasted_indepn_var = self.fill_missing_vals(wether_df,last_weather_forecast_diff)
+            predicted_values_to_append = forecasted_indepn_var.yhat  # actual forecasted values
+
+            predicted_values_to_append = predicted_values_to_append.to_frame()  # to dataframe
+            predicted_values_to_append.insert(0, "date",
+                                              pd.date_range(start=self.max_weather_dates[weather_id] + relativedelta(months=+1),
+                                                            periods=last_weather_forecast_diff,
+                                                            freq='MS'))  # generate new time periods for forecasted data.
+            wether_df = wether_df.reset_index()
+            wether_df.columns = ['date', 'value']
+            wether_df=wether_df.set_index('date')
+            predicted_values_to_append.columns = ['date', 'value']
+            predicted_values_to_append=predicted_values_to_append.set_index('date')
+            concatnated_df = pd.concat([wether_df, predicted_values_to_append])
+            print("pronuu  ------->>")
+            print(concatnated_df)
+            concatnated_df=concatnated_df.reset_index()
+            concatnated_df=concatnated_df.set_index('date', drop=True)
+            concatnated_df.index = pd.DatetimeIndex(concatnated_df.index)  # make index datetime
+            print("nod quodum of data =========> 0")
+            print(concatnated_df)
+            return concatnated_df
+        else:
+            log.info("truncating excess data ========>")
+            print(wether_df)
+            wether_df=wether_df.truncate(after=last_date_forecast) #if data has more data that last indicator date data available, truncante
+            log.info("truncanted data %s " % wether_df.tail())
+            print("nod quodum of data =========> 1")
+            wether_df = wether_df.reset_index()
+            wether_df.columns = ['date', 'value']
+            print(wether_df)
+
+            wether_df = wether_df.set_index('date', drop=True)
+            return wether_df
+
 
     '''
        implementation of multivariate prediction analysis.
@@ -285,14 +327,27 @@ class WeatherCorrelation:
         self.set_max_min_period(orgunit_id, indicator_id)
         indic_data = self.get_indicator_data(orgunit_id, indicator_id)
         weather_data = self.get_weather_by_year(orgunit_id,weather_id=weather_id)
-        #return (weather_df,weather_payload,weather_meta,data_list_above_indicator_last_df)
-        #concant weather df with extra data up to the date from last indicator update + time_range
+
+
+        print("weather ===>>>")
+        print(weather_data)
+        print("indicator ======>>>")
+        print(indic_data)
+        print("weather ===>>> [[[[")
+
+        a = indic_data[0].set_index('startdate')
+        b = weather_data[0].set_index('startdate')
+        a = pd.DatetimeIndex(a.index)  # make index datetime
+        b = pd.DatetimeIndex(b.index)  # make index datetime
+        concat_wther_indic = pd.concat([a,b],axis=1)
+        print(concat_wther_indic.head(50))
+        print(concat_wther_indic.index)
+        print("weather ===>>> after concant")
+
 
         columns_to_drop = [wther_condition for wther_condition in ['dew_point', 'humidity', 'temperature', 'pressure'] if wther_condition!=wther_dict[weather_id]]
         wther_upto_indicator_date = weather_data[0]
         wther_aftr_indicator_available=weather_data[3]
-        log.info("columns to drop in data frame")
-        log.info(columns_to_drop)
 
         wther_upto_indicator_date=wther_upto_indicator_date.drop(columns=columns_to_drop)
         wther_aftr_indicator_available=wther_aftr_indicator_available.drop(columns=columns_to_drop)
@@ -303,79 +358,61 @@ class WeatherCorrelation:
         weather_df_to_concant = []
         weather_df_to_concant.append(wther_upto_indicator_date)
         weather_df_to_concant.append(wther_aftr_indicator_available)
-
         wether_df = pd.concat(weather_df_to_concant)
-        log.info("concatenated df  === >")
-        log.info(wether_df.tail(30))
-        
 
         last_date_forecast = self.max_indicator_dates[indicator_id] + relativedelta(months=+time_range)
-        last_weather_forecast_diff =months_between(last_date_forecast, self.max_weather_dates[weather_id])
-        if last_weather_forecast_diff>0: # forecast weather data if date of last predict higher than available data
-            forecasted_indepn_var = self.fill_missing_vals(wether_df,last_weather_forecast_diff)
-            #forecasted_indepn_var = forecasted_indepn_var.rename(columns={'value': weather_id})
-        else:
-            wether_df=wether_df.truncate(after=last_date_forecast) #if data has more data that last indicator date data available, truncante
+        last_weather_forecast_diff =months_between(self.max_weather_dates[weather_id],last_date_forecast)
+        log.info("max weather data date vs max forecast date =========>")
+        log.info("forecast %s" %last_date_forecast)
+        log.info("weather %s" %self.max_weather_dates[weather_id])
+        log.info("diff (-) %s" %last_weather_forecast_diff)
 
-        weather_df = weather_data[0]
+        forecasted_indepn_var=self._forecast_independent_variable(last_weather_forecast_diff,wether_df,weather_id,last_date_forecast)
+        forecasted_indepn_var = forecasted_indepn_var.reset_index()
+        subset_start_pos =self.max_indicator_dates[indicator_id] + relativedelta(months=+1)
+        forecasted_indepn_var=forecasted_indepn_var.fillna(forecasted_indepn_var.mean())
+        print("nod quodum of data =========>")
+        print(forecasted_indepn_var)
+        forecasted_indepn_var['date'] = pd.to_datetime(forecasted_indepn_var['date']).dt.date
 
-        indicator_df = indic_data[0]
-        indicator_df = indicator_df.fillna(indicator_df.mean())  # fill NaN with averages.
+        forcast_data_range = forecasted_indepn_var[(forecasted_indepn_var['date'] > self.max_indicator_dates[indicator_id]) & (forecasted_indepn_var['date'] <= last_date_forecast)]
+        forecasted_indepn_var = forecasted_indepn_var.set_index("date", drop=True)
+        indepent_var_trains = forecasted_indepn_var.truncate(after=self.max_indicator_dates[indicator_id])  # weather data to use for fitting
 
-        weather_df['startdate'] = weather_df['startdate'].astype('datetime64[ns]')
-        indicator_df['startdate'] = indicator_df['startdate'].astype('datetime64[ns]')
-        indicator_df = indicator_df.set_index('startdate')  # make startdate index to allow concatination axes reference
-        weather_df = weather_df.set_index('startdate')  # make startdate index to allow concatination axes reference
-        final_df = pd.concat([indicator_df, weather_df], axis=1, sort=False)
-        final_df = final_df.fillna(final_df.mean())  # fill NaN with averages.
-        final_df['kpivalue'] = final_df['kpivalue'].astype('float64')
+        indepent_var_trains = numpy.array(indepent_var_trains.values).astype(numpy.float)
+        indepent_var_trains=numpy.round(indepent_var_trains,3)
+        indepent_var_trains = numpy.reshape(indepent_var_trains, (-1, 1))
 
+        forcast_data_range = numpy.array(forcast_data_range['value']).astype(float)
+        forcast_data_range=numpy.round(forcast_data_range,3)
 
-        if (weather_id == 2):
-            final_df['dew_point'] = final_df['dew_point'].astype('float64')
-            final_df=final_df.drop(columns=[ 'humidity', 'temperature', 'pressure'])
-        if (weather_id == 3):
-           final_df['humidity'] = final_df['humidity'].astype('float64')
-           final_df=final_df.drop(columns=['dew_point', 'temperature', 'pressure'])
-        if (weather_id == 1):
-            final_df['temperature'] = final_df['temperature'].astype('float64')
-            final_df=final_df.drop(columns=['dew_point', 'humidity', 'pressure'])
-        if (weather_id == 5):
-            final_df['pressure'] = final_df['pressure'].astype('float64')
-            final_df=final_df.drop(columns=['dew_point', 'humidity', 'temperature'])
+        forcast_data_range = numpy.reshape(forcast_data_range, (-1, 1))
 
+        indicator_dframe = indic_data[0].fillna(indic_data[0].mean())
+        X = indepent_var_trains
+        indicator_dframe=indicator_dframe['kpivalue'].astype(float)
+        Y = numpy.array(indicator_dframe.values) # value to be forecasted - multivariate
+        regr = linear_model.LinearRegression()
 
-        # we split the data frame to training and test series
-        nobs = 4
-        df_train, df_test = final_df[0:-nobs], final_df[-nobs:]
+        print("sizes ===============>")
+        print(X)
+        print(Y)
+        print("sizes ===============>")
 
-        # make the series stationary
-
-        df_differenced = self.make_series_stationary(df_train)
-        model = VAR(df_differenced)
-        # fit model
-        model_fitted = model.fit()
-
-        # Get the lag order
-        lag_order = model_fitted.k_ar
-
-        # Input data for forecasting
-        forecast_input = df_differenced.values[-lag_order:]
-
-        # Forecast
-        forecast_data = model_fitted.forecast(y=forecast_input, steps=time_range)
-
-        df_forecast = pd.DataFrame(forecast_data, columns=final_df.columns)
-        predicted_results = self.invert_transformation(df_train, df_forecast)
-        return (predicted_results, indic_data)
+        regr.fit(X, Y)
+        forecast_data = regr.predict(forcast_data_range)
+        df_forecast = pd.DataFrame(forecast_data)
+        df_forecast.columns=['kpivalue']
+        return (df_forecast, indic_data)
 
 
     def do_multivariate_prediction(self, indicator_id,orgunit_id, weather_id, time_range):
         time_range = int(time_range)
         weather_id= int(weather_id)
         self._indicator_id = indicator_id
-        # indic_data = final_df,indic_payload_values,indic_meta_list,org_meta_list
-        # var_data = predicted_results,indic_data
+        print("set indicator ===========>>>")
+        print(self._indicator_id)
+        print(indicator_id)
         var_data = self.run_var_prediction(indicator_id,orgunit_id, weather_id, time_range)
         var_dat=var_data[1][0].set_index("startdate")
         # end_forecast_date = var_dat.index[-1] + datetime.timedelta(days=time_range)
@@ -387,11 +424,11 @@ class WeatherCorrelation:
 
         forecast_payload_values = {}
         forecast_payload_values['kpivalue'] = []
+
         for items in predicted_dataframe['kpivalue'].iteritems():
             indict_list = forecast_payload_values['kpivalue']
             indic_val = {"date": str(items[0].date()), "value": str(round(items[1], 2)), "ouid": str(orgunit_id)}
             indict_list.append(indic_val)
-
 
         # assemble result
         dictionary = {
@@ -412,4 +449,4 @@ class WeatherCorrelation:
         return result
 
 r=WeatherCorrelation()
-r.do_multivariate_prediction(23185,23408,2,10)
+r.do_multivariate_prediction(82257,23401,3,5)
