@@ -316,6 +316,10 @@ class WeatherCorrelation:
 
     '''
        implementation of multivariate prediction analysis.
+       1. Generally gets weather and indicator data from storage. Formats into Dataframes and merges(left join, left on indicator data) along the periods(dates).
+       2. Does forecasting on the independent variable(weather) upto the requeted time range.
+       3. Greps data from the forecast data from last indicator period to end of forecast date request. This data is used to regress with the dependent variable to get corresponding
+          data points
     '''
     def run_var_prediction(self, indicator_id,orgunit_id, weather_id, time_range):
         wther_dict = {2: 'dew_point', 3: 'humidity',1: 'temperature',5: 'pressure'}
