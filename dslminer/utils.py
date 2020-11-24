@@ -14,4 +14,4 @@ def months_between(d1, d2):
     # d1 = datetime.strptime(d1, "%Y-%m-%d")
     # d2 = datetime.strptime(d2, "%Y-%m-%d")
     num_months = (d2.year - d1.year) * 12 + (d2.month - d1.month)
-    return abs(num_months)
+    return num_months
