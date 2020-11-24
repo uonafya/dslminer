@@ -78,6 +78,9 @@ def do_multivariate_prediction(indicatorid,orgunit,weather_id,period_range):
     app.logger.info(weather_id)
     p=weather_correlation.WeatherCorrelation()
     app.logger.debug("===indicator-weather forecast analysis===")
+    indicatorid = int(indicatorid)
+    weather_id = int(weather_id)
+    period_range = int(period_range)
     data=p.do_multivariate_prediction(indicatorid,orgunit,weather_id,period_range)
 
     data=json.dumps(data)
