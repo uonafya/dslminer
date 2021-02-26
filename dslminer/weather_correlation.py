@@ -2,14 +2,16 @@ import logging
 from builtins import int
 
 import pandas as pd
-import db
+from . import db
 from dateutil.relativedelta import *
 import datetime
 from sklearn import linear_model
 from fbprophet import Prophet
 import numpy
+from. import utils
 
-from utils import months_between
+months_between = utils.months_between
+
 
 # configurations
 log = logging.getLogger("weather correlation")

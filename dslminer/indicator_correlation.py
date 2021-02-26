@@ -1,13 +1,14 @@
 import logging
 import pandas as pd
-import db
+from . import db
 import datetime
 from sklearn import linear_model
 from fbprophet import Prophet
 from dateutil.relativedelta import *
 import numpy
 
-from utils import diff_month
+from . import utils
+diff_month = utils.diff_month
 
 # configurations
 log = logging.getLogger("indicator correlation")
