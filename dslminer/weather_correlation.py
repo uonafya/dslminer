@@ -6,7 +6,7 @@ from . import db
 from dateutil.relativedelta import *
 import datetime
 from sklearn import linear_model
-from fbprophet import Prophet
+from neuralprophet import NeuralProphet
 import numpy
 from. import utils
 
@@ -271,7 +271,7 @@ class WeatherCorrelation:
     '''
     def fill_missing_vals(self,series, leap):
         series=series.reset_index()
-        m = Prophet()
+        m = NeuralProphet()
         series.columns = ['ds','y']
         m.fit(series)
         future = m.make_future_dataframe(periods=leap, freq='M',include_history = False)

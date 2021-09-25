@@ -1,5 +1,5 @@
 import pandas as pd
-from fbprophet import Prophet
+from neuralprophet import NeuralProphet
 from . import db
 from flask import Flask
 
@@ -19,7 +19,7 @@ class predictor:
         data = pd.DataFrame(SQL_Query)
         _db.close_db_con()
         #decomposition = sm.tsa.seasonal_decompose(data.kpivalue, freq=20)
-        m = Prophet()
+        m = NeuralProphet()
         data.columns = ['ds','y']
         m.fit(data)
 

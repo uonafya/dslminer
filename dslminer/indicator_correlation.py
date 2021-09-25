@@ -3,7 +3,7 @@ import pandas as pd
 from . import db
 import datetime
 from sklearn import linear_model
-from fbprophet import Prophet
+from neuralprophet import NeuralProphet
 from dateutil.relativedelta import *
 import numpy
 
@@ -279,7 +279,7 @@ class IndicatorCorrelation:
         projects missing values from given series data
     '''
     def fill_missing_vals(self,series, leap):
-        m = Prophet()
+        m = NeuralProphet()
         series.columns = ['ds','y']
         m.fit(series)
         future = m.make_future_dataframe(periods=leap, freq='M',include_history = False)
